@@ -1,17 +1,24 @@
+import math
 import os
 import uuid
 
+import numpy as np
 import requests
 import srt_equalizer
 import assemblyai as aai
 
 from typing import List
-from moviepy.editor import *
+
+from PIL import Image
+from moviepy import *
+from moviepy.Clip import Clip
+from moviepy.video.fx import Crop
 from termcolor import colored
 from dotenv import load_dotenv
 from datetime import timedelta
-from moviepy.video.fx.all import crop
 from moviepy.video.tools.subtitles import SubtitlesClip
+
+from Backend.zoom import ZoomInEffect
 
 load_dotenv("../.env")
 
@@ -183,13 +190,13 @@ def combine_videos(video_paths: List[str], max_duration: int, max_clip_duration:
             # Not all videos are same size,
             # so we need to resize them
             if round((clip.w/clip.h), 4) < 0.5625:
-                clip = crop(clip, width=clip.w, height=round(clip.w/0.5625), \
-                            x_center=clip.w / 2, \
-                            y_center=clip.h / 2)
+                clip = Crop(width=clip.w, height=round(clip.w/0.5625),
+                            x_center=clip.w / 2,
+                            y_center=clip.h / 2).apply(clip)
             else:
-                clip = crop(clip, width=round(0.5625*clip.h), height=clip.h, \
-                            x_center=clip.w / 2, \
-                            y_center=clip.h / 2)
+                clip = Crop(width=round(0.5625*clip.h), height=clip.h,
+                            x_center=clip.w / 2,
+                            y_center=clip.h / 2).apply(clip)
             clip = clip.resize((1080, 1920))
 
             if clip.duration > max_clip_duration:
@@ -236,13 +243,28 @@ def generate_video(combined_video_path: str, tts_path: str, subtitles_path: str,
     subtitles = SubtitlesClip(subtitles_path, generator)
     result = CompositeVideoClip([
         VideoFileClip(combined_video_path),
-        subtitles.set_pos((horizontal_subtitles_position, vertical_subtitles_position))
+        subtitles.with_position((horizontal_subtitles_position, vertical_subtitles_position))
     ])
 
     # Add the audio
     audio = AudioFileClip(tts_path)
-    result = result.set_audio(audio)
+    result = result.with_audio(audio)
 
     result.write_videofile("../temp/output.mp4", threads=threads or 2)
 
     return "output.mp4"
+
+def img_to_video(img: str, duration=5) -> VideoClip:
+
+
+
+    zoom_effect = ZoomInEffect()
+    return zoom_effect.apply(
+            ImageClip(img)
+            .with_duration(duration)
+            .with_fps(60)
+    )
+
+if __name__ == "__main__":
+     c = img_to_video("test.png")
+     c.write_videofile("test.mp4")
