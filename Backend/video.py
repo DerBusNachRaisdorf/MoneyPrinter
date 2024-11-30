@@ -18,8 +18,6 @@ from dotenv import load_dotenv
 from datetime import timedelta
 from moviepy.video.tools.subtitles import SubtitlesClip
 
-from Backend.zoom import ZoomInEffect
-
 load_dotenv("../.env")
 
 ASSEMBLY_AI_API_KEY = os.getenv("ASSEMBLY_AI_API_KEY")
@@ -255,7 +253,40 @@ def generate_video(combined_video_path: str, tts_path: str, subtitles_path: str,
     return "output.mp4"
 
 def img_to_video(img: str, duration=5) -> VideoClip:
+    class ZoomInEffect(Effect):
+        def __init__(self, zoom_ratio=0.04):
+            self.zoom_ratio = zoom_ratio
+            super().__init__()
 
+        def apply(self, clip: Clip) -> VideoClip:
+            def transform_frame(get_frame, t: int):
+                pil_frame = Image.fromarray(get_frame(t))
+                base_size = pil_frame.size
+
+                new_size_buf = (
+                    math.ceil(pil_frame.size[0] * (1 + (self.zoom_ratio * t))),
+                    math.ceil(pil_frame.size[1] * (1 + (self.zoom_ratio * t)))
+                )
+
+                 # The new dimensions must be even.
+                new_size = (new_size_buf[0] + (new_size_buf[0] % 2), new_size_buf[1] + (new_size_buf[1] % 2))
+
+                pil_frame = pil_frame.resize(new_size, Image.LANCZOS)
+
+                x = math.ceil((new_size[0] - base_size[0]) / 2)
+                y = math.ceil((new_size[1] - base_size[1]) / 2)
+
+                pil_frame = pil_frame.crop((
+                    x, y, new_size[0] - x, new_size[1] - y
+                )).resize(base_size, Image.LANCZOS)
+
+                result = np.array(pil_frame)
+                pil_frame.close()
+
+                return result
+
+
+            return clip.transform(transform_frame, keep_duration=True)
 
 
     zoom_effect = ZoomInEffect()
